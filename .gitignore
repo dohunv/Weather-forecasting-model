@@ -1,1 +1,25 @@
+# ===== Python =====
+__pycache__/
+*.pyc
+
+# ===== Jupyter / Colab =====
+.ipynb_checkpoints/
+.config/
+sample_data/
+
+# ===== Data lớn =====
+*.csv
+*.xlsx
+
+# ===== Model & scaler =====
+*.pkl
+*.joblib
+
+# ===== Logs & temp =====
+*.log
+*.deb
+
+# ===== OS =====
+.DS_Store
+Thumbs.db
 
