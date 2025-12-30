@@ -3,113 +3,125 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import pickle
+import os
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
 
-# ===============================
-# LOAD MODELS & METADATA
-# ===============================
-rf_model = pickle.load(open("rf_model.pkl", "rb"))
-knn_model = pickle.load(open("knn_model.pkl", "rb"))
+# Load data
+@st.cache_data
+def load_data():
+    df = pd.read_csv("weatherAUS.csv")
+    return df
+
+df = load_data()
+
+st.set_page_config(page_title="🌧️ Dự Báo Mưa Ngày Mai", layout="centered")
+st.title("🌦️ Dự Báo Mưa Ngày Mai tại Úc")
+st.markdown("Nhập các thông số thời tiết hôm nay để dự đoán ngày mai có mưa không.")
+
+# Nếu chưa có model thì train nhanh và lưu
+if not os.path.exists("model.pkl") or not os.path.exists("scaler.pkl"):
+    st.info("Đang chuẩn bị mô hình lần đầu... (chỉ mất ~30 giây)")
+    
+    # Tiền xử lý nhanh
+    data = df.copy()
+    data = data.dropna(subset=['RainTomorrow'])
+    
+    # Feature cơ bản
+    features = ['MinTemp', 'MaxTemp', 'Rainfall', 'Evaporation', 'Sunshine',
+                'WindGustSpeed', 'Humidity9am', 'Humidity3pm', 'Pressure9am',
+                'Pressure3pm', 'Cloud9am', 'Cloud3pm', 'Temp9am', 'Temp3pm']
+    
+    data = data[features + ['RainToday', 'RainTomorrow']].dropna()
+    
+    # Encode RainToday
+    data['RainToday'] = data['RainToday'].map({'No': 0, 'Yes': 1})
+    data['RainTomorrow'] = data['RainTomorrow'].map({'No': 0, 'Yes': 1})
+    
+    X = data[features + ['RainToday']]
+    y = data['RainTomorrow']
+    
+    # Train test split
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    
+    # Scale
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(X_train)
+    
+    # Train model
+    model = RandomForestClassifier(n_estimators=100, random_state=42)
+    model.fit(X_train_scaled, y_train)
+    
+    # Lưu model và scaler
+    pickle.dump(model, open("model.pkl", "wb"))
+    pickle.dump(scaler, open("scaler.pkl", "wb"))
+    pickle.dump(features + ['RainToday'], open("feature_names.pkl", "wb"))
+    
+    st.success("Mô hình đã sẵn sàng!")
+
+# Load model
+model = pickle.load(open("model.pkl", "rb"))
 scaler = pickle.load(open("scaler.pkl", "rb"))
 feature_names = pickle.load(open("feature_names.pkl", "rb"))
 
-# ===============================
-# PAGE CONFIG
-# ===============================
-st.set_page_config(
-    page_title="🌦️ RainTomorrow Prediction",
-    layout="centered"
-)
+# Input form
+st.subheader("📊 Nhập thông tin thời tiết hôm nay")
 
-st.title("🌦️ Dự báo mưa ngày mai")
-st.write("Nhập thông tin thời tiết để dự đoán **RainTomorrow**.")
+col1, col2 = st.columns(2)
 
-# ===============================
-# INPUT FORM (giữ nguyên code phần input của bạn)
-# ===============================
-st.subheader("🔧 Thông tin thời tiết")
+with col1:
+    MinTemp = st.slider("Nhiệt độ thấp nhất (°C)", -10.0, 40.0, 15.0)
+    MaxTemp = st.slider("Nhiệt độ cao nhất (°C)", 0.0, 50.0, 25.0)
+    Rainfall = st.slider("Lượng mưa hôm nay (mm)", 0.0, 200.0, 0.0)
+    Humidity9am = st.slider("Độ ẩm 9h sáng (%)", 0, 100, 70)
+    Humidity3pm = st.slider("Độ ẩm 3h chiều (%)", 0, 100, 50)
+    Pressure9am = st.slider("Áp suất 9h sáng (hPa)", 980.0, 1040.0, 1015.0)
 
-MinTemp = st.slider("MinTemp (°C)", -10.0, 35.0, 10.0)
-MaxTemp = st.slider("MaxTemp (°C)", 0.0, 50.0, 25.0)
-Rainfall = st.slider("Rainfall (mm)", 0.0, 300.0, 0.0)
-Evaporation = st.slider("Evaporation (mm)", 0.0, 25.0, 5.0)
-Sunshine = st.slider("Sunshine (hours)", 0.0, 15.0, 8.0)
+with col2:
+    Pressure3pm = st.slider("Áp suất 3h chiều (hPa)", 980.0, 1040.0, 1013.0)
+    Cloud9am = st.slider("Mây che 9h sáng (0-8)", 0, 8, 4)
+    Cloud3pm = st.slider("Mây che 3h chiều (0-8)", 0, 8, 4)
+    WindGustSpeed = st.slider("Tốc độ gió giật (km/h)", 0, 130, 35)
+    Sunshine = st.slider("Số giờ nắng", 0.0, 15.0, 7.0)
+    RainToday = st.selectbox("Hôm nay có mưa không?", ["Không", "Có"])
 
-WindGustDir = st.selectbox("WindGustDir (encoded)", list(range(16)))
-WindGustSpeed = st.slider("WindGustSpeed (km/h)", 0, 150, 40)
+RainToday = 1 if RainToday == "Có" else 0
 
-WindDir9am = st.selectbox("WindDir9am (encoded)", list(range(16)))
-WindDir3pm = st.selectbox("WindDir3pm (encoded)", list(range(16)))
+# Tạo vector input
+input_data = pd.DataFrame([{
+    'MinTemp': MinTemp,
+    'MaxTemp': MaxTemp,
+    'Rainfall': Rainfall,
+    'Evaporation': 5.0,  # giá trị trung bình
+    'Sunshine': Sunshine,
+    'WindGustSpeed': WindGustSpeed,
+    'Humidity9am': Humidity9am,
+    'Humidity3pm': Humidity3pm,
+    'Pressure9am': Pressure9am,
+    'Pressure3pm': Pressure3pm,
+    'Cloud9am': Cloud9am,
+    'Cloud3pm': Cloud3pm,
+    'Temp9am': (MinTemp + MaxTemp)/2 * 0.8,
+    'Temp3pm': (MinTemp + MaxTemp)/2 * 1.1,
+    'RainToday': RainToday
+}])
 
-WindSpeed9am = st.slider("WindSpeed9am (km/h)", 0, 80, 10)
-WindSpeed3pm = st.slider("WindSpeed3pm (km/h)", 0, 80, 15)
+# Scale
+input_scaled = scaler.transform(input_data)
 
-Humidity9am = st.slider("Humidity9am (%)", 0, 100, 60)
-Humidity3pm = st.slider("Humidity3pm (%)", 0, 100, 50)
-
-Pressure9am = st.slider("Pressure9am (hPa)", 980.0, 1045.0, 1015.0)
-Pressure3pm = st.slider("Pressure3pm (hPa)", 980.0, 1045.0, 1012.0)
-
-Cloud9am = st.slider("Cloud9am (0–8)", 0, 8, 4)
-Cloud3pm = st.slider("Cloud3pm (0–8)", 0, 8, 4)
-
-Temp9am = st.slider("Temp9am (°C)", 0.0, 40.0, 18.0)
-Temp3pm = st.slider("Temp3pm (°C)", 0.0, 45.0, 25.0)
-
-RainToday = st.selectbox("Hôm nay có mưa không?", ["No", "Yes"])
-RainToday = 1 if RainToday == "Yes" else 0
-
-Month = st.slider("Month", 1, 12, 6)
-
-Temp_Diff = MaxTemp - MinTemp
-
-# ===============================
-# BUILD INPUT VECTOR
-# ===============================
-row = {col: 0 for col in feature_names}
-
-row.update({
-    "MinTemp": MinTemp,
-    "MaxTemp": MaxTemp,
-    "Rainfall": Rainfall,
-    "Evaporation": Evaporation,
-    "Sunshine": Sunshine,
-    "WindGustDir": WindGustDir,
-    "WindGustSpeed": WindGustSpeed,
-    "WindDir9am": WindDir9am,
-    "WindDir3pm": WindDir3pm,
-    "WindSpeed9am": WindSpeed9am,
-    "WindSpeed3pm": WindSpeed3pm,
-    "Humidity9am": Humidity9am,
-    "Humidity3pm": Humidity3pm,
-    "Pressure9am": Pressure9am,
-    "Pressure3pm": Pressure3pm,
-    "Cloud9am": Cloud9am,
-    "Cloud3pm": Cloud3pm,
-    "Temp9am": Temp9am,
-    "Temp3pm": Temp3pm,
-    "RainToday": RainToday,
-    "Temp_Diff": Temp_Diff,
-    "Month": Month
-})
-
-X_input = pd.DataFrame([row])
-X_scaled = scaler.transform(X_input)
-
-# ===============================
-# MODEL SELECTION & PREDICTION
-# ===============================
-st.subheader("📌 Chọn mô hình")
-model_choice = st.radio("Model", ["Random Forest", "KNN"])
-
-if st.button("🔍 Dự đoán"):
-    model = rf_model if model_choice == "Random Forest" else knn_model
-    y_pred = model.predict(X_scaled)[0]
-    prob = model.predict_proba(X_scaled)[0][1]
-
-    if y_pred == 1:
-        st.success(f"🌧️ **Ngày mai có khả năng mưa** — Xác suất: {prob:.2f}")
+if st.button("🔮 Dự đoán ngày mai có mưa không?"):
+    pred = model.predict(input_scaled)[0]
+    prob = model.predict_proba(input_scaled)[0][1]
+    
+    if pred == 1:
+        st.error(f"🌧️ **NGÀY MAI SẼ MƯA**")
+        st.write(f"Xác suất mưa: **{prob:.1%}**")
     else:
-        st.info(f"☀️ **Ngày mai không mưa** — Xác suất mưa: {prob:.2f}")
+        st.success(f"☀️ **NGÀY MAI KHÔNG MƯA**")
+        st.write(f"Xác suất mưa: **{prob:.1%}**")
+    
+    st.balloons()
 
 st.markdown("---")
-st.caption("© 2025 RainTomorrow Prediction – Streamlit Demo")
+st.caption("Demo dự báo mưa sử dụng Random Forest trên dữ liệu WeatherAUS")
