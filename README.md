@@ -1,5 +1,8 @@
 # Weather-forecasting-model
 # 🌦️ RainTomorrow – Dự báo mưa bằng Học máy
+# Người thực hiện: Đỗ Xuân Hùng 
+# Mã sinh viên: 12423014
+# Lớp: 124231
 
 ## 1. Giới thiệu đề tài
 
@@ -140,15 +143,14 @@ Kết quả cho thấy:
 
 ## 6. Hướng dẫn chạy dự án
 
-### 6.1. Cài môi trường hoặc chạy trực tiếp bằng colab ở dưới
-(https://colab.research.google.com/)
+ Các bạn có thể tải file ML_DuBaoTT.ipynb ở phần app về và data bài có ở link trên. Các bạn có thể mở file trực tiếp bằng gg collab bằng đường dẫn:( https://colab.research.google.com/drive/1PXlE7kFUsMcu412_ACKZO6i8NCMGl-cH#scrollTo=kJ7WFDPBcY76) và sau đó upload file dữ liệu bằng cách nhấn vào folder bên trái màn và up dữ liệu lên. Cảm ơn mn đã xem bài của tớ :)))
 
-Cài các thư viện cần thiết:
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-import random
-import io
-import pickle
-import os
+Cài các thư viện cần thiết: ( phần này nếu bạn dùng gg collab có thể không cần cài vì mình đã khai báo sẵn trong bài)
+- import numpy as np
+- import pandas as pd
+- import matplotlib.pyplot as plt
+- import seaborn as sns
+- import random
+- import io
+- import pickle
+- import os
